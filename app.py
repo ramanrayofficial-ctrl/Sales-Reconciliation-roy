@@ -23,49 +23,55 @@ def main():
         with col2: portal_file = st.file_uploader("Portal File", type=['xlsx'])
         
         if tally_file and portal_file:
-            if st.button("🚀 Process Month-Wise"):
+            if st.button("🚀 Process Data"):
+                # Data Load
                 df_t = pd.read_excel(tally_file, header=1)
                 df_p = pd.read_excel(portal_file)
                 
                 df_t.columns = ['Date', 'Name', 'Tally Sales']
                 df_p.columns = ['Date', 'Name', 'Portal Sales']
                 
+                # Date Processing
                 df_t['Date'] = pd.to_datetime(df_t['Date'])
                 df_p['Date'] = pd.to_datetime(df_p['Date'])
                 
-                df_t['Date_Display'] = df_t['Date'].dt.strftime('%d-%m-%Y')
-                df_p['Date_Display'] = df_p['Date'].dt.strftime('%d-%m-%Y')
+                df_t['Tally Date'] = df_t['Date'].dt.strftime('%d-%m-%Y')
+                df_p['Portal Date'] = df_p['Date'].dt.strftime('%d-%m-%Y')
                 
-                df_t['Month'] = df_t['Date'].dt.to_period('M').astype(str)
-                df_p['Month'] = df_p['Date'].dt.to_period('M').astype(str)
+                df_t['Month'] = df_t['Date'].dt.to_period('M')
+                df_p['Month'] = df_p['Date'].dt.to_period('M')
                 
+                # Merge
                 merged = pd.merge(df_t, df_p, on=['Month', 'Name'], suffixes=('_T', '_P'))
                 
-                merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days
+                # Calculations
+                merged['Date_Diff'] = (df_t['Date'] - df_p['Date']).dt.days
                 merged['Amt_Diff'] = merged['Tally Sales'] - merged['Portal Sales']
                 
-                # Selection of Columns for Display
-                cols_to_show = ['Month', 'Name', 'Date_Display_T', 'Tally Sales', 'Date_Display_P', 'Portal Sales', 'Amt_Diff', 'Date_Diff']
+                # Final Columns Order
+                cols_to_show = ['Name', 'Tally Date', 'Tally Sales', 'Portal Date', 'Portal Sales', 'Date_Diff', 'Amt_Diff']
                 
                 matches = merged[(merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)]
                 not_matches = merged[~((merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500))]
                 
+                # Monthly Analysis (Summary)
                 summary = merged.groupby('Month').agg({'Tally Sales': 'sum', 'Portal Sales': 'sum', 'Amt_Diff': 'sum'})
                 
                 st.write("### 📈 Monthly Analysis")
                 st.dataframe(summary, height=200)
                 
                 st.write("### ✅ Matches")
-                st.dataframe(matches[cols_to_show], height=300)
+                st.dataframe(matches[cols_to_show], height=400)
                 
                 st.write("### ❌ Not Matches")
-                st.dataframe(not_matches[cols_to_show], height=300)
+                st.dataframe(not_matches[cols_to_show], height=400)
                 
+                # Excel Download
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     summary.to_excel(writer, sheet_name='Summary')
-                    matches.to_excel(writer, sheet_name='Matches')
-                    not_matches.to_excel(writer, sheet_name='Not_Matches')
+                    matches.to_excel(writer, sheet_name='Matches', index=False)
+                    not_matches.to_excel(writer, sheet_name='Not_Matches', index=False)
                 st.download_button("📥 Download Final Report", output.getvalue(), "Recon_Final.xlsx")
 
         if st.button("Logout"):
