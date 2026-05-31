@@ -5,7 +5,7 @@ import io
 st.set_page_config(page_title="Professional Recon", layout="wide")
 
 def main():
-    st.title("📊 Advanced Sales Reconciliation (Month-Wise)")
+    st.title("📊 Advanced Sales Reconciliation")
     
     if 'authenticated' not in st.session_state: st.session_state.authenticated = False
 
@@ -24,42 +24,45 @@ def main():
         
         if tally_file and portal_file:
             if st.button("🚀 Process Month-Wise"):
+                # Data Load
                 df_t = pd.read_excel(tally_file, header=1)
                 df_p = pd.read_excel(portal_file)
-                df_t.columns = ['Date', 'Name', 'Amount']
-                df_p.columns = ['Date', 'Name', 'Amount']
                 
-                # Date fix aur Month nikalna
+                # Column Headings set karna
+                df_t.columns = ['Date', 'Name', 'Tally Sales']
+                df_p.columns = ['Date', 'Name', 'Portal Sales']
+                
+                # Date fix
                 df_t['Date'] = pd.to_datetime(df_t['Date']).dt.normalize()
                 df_p['Date'] = pd.to_datetime(df_p['Date']).dt.normalize()
                 
                 df_t['Month'] = df_t['Date'].dt.to_period('M').astype(str)
                 df_p['Month'] = df_p['Date'].dt.to_period('M').astype(str)
                 
-                # AB MATCHING: Month aur Name dono check honge
+                # Merge
                 merged = pd.merge(df_t, df_p, on=['Month', 'Name'], suffixes=('_T', '_P'))
                 
                 # Calculations
                 merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days
-                merged['Amt_Diff'] = merged['Amount_T'] - merged['Amount_P']
+                merged['Amt_Diff'] = merged['Tally Sales'] - merged['Portal Sales']
                 
-                # Separate Matches & Not Matches
+                # Categorization
                 matches = merged[(merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)]
                 not_matches = merged[~((merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500))]
                 
-                # Final Summary (Month-wise)
-                summary = merged.groupby('Month').agg({'Amount_T': 'sum', 'Amount_P': 'sum', 'Amt_Diff': 'sum'})
+                # Summary
+                summary = merged.groupby('Month').agg({'Tally Sales': 'sum', 'Portal Sales': 'sum', 'Amt_Diff': 'sum'})
                 
-                st.write("### 📈 Monthly Analysis (Accurate)")
+                st.write("### 📈 Monthly Analysis")
                 st.dataframe(summary, height=200)
                 
                 st.write("### ✅ Matches")
-                st.dataframe(matches[['Month', 'Name', 'Amount_T', 'Amount_P', 'Amt_Diff']], height=300)
+                st.dataframe(matches[['Month', 'Name', 'Tally Sales', 'Portal Sales', 'Amt_Diff']], height=300)
                 
                 st.write("### ❌ Not Matches")
                 st.dataframe(not_matches, height=300)
                 
-                # Excel Download
+                # Download
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     summary.to_excel(writer, sheet_name='Summary')
