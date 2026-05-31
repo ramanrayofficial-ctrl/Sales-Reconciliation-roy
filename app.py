@@ -29,29 +29,31 @@ def main():
                 df_t.columns = ['Date', 'Name', 'Amount']
                 df_p.columns = ['Date', 'Name', 'Amount']
                 
-                # Time hatane ke liye sirf Date rakhein
+                # Date format fix (Time hatane ke liye)
                 df_t['Date'] = pd.to_datetime(df_t['Date']).dt.normalize()
                 df_p['Date'] = pd.to_datetime(df_p['Date']).dt.normalize()
                 
                 # Merge
                 merged = pd.merge(df_t, df_p, on='Name', suffixes=('_T', '_P'))
-                merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days.abs()
-                merged['Amt_Diff'] = (merged['Amount_T'] - merged['Amount_P']).abs()
                 
-                # Logic: Match Criteria
-                matches = merged[(merged['Date_Diff'] <= 15) & (merged['Amt_Diff'] <= 1500)]
-                not_matches = merged[~((merged['Date_Diff'] <= 15) & (merged['Amt_Diff'] <= 1500))]
+                # Difference Calculation (Plus/Minus sahi aayega)
+                merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days
+                merged['Amt_Diff'] = merged['Amount_T'] - merged['Amount_P'] 
                 
-                # Monthly Calculation (Fixed)
+                # Categorization based on logic
+                matches = merged[(merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)]
+                not_matches = merged[~((merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500))]
+                
+                # Monthly Summary
                 merged['Month'] = merged['Date_T'].dt.to_period('M').astype(str)
                 summary = merged.groupby('Month').agg({'Amount_T': 'sum', 'Amount_P': 'sum', 'Amt_Diff': 'sum'})
                 
-                # Display with Height limit (Scroll fix)
+                # UI Tables (Scrollable)
                 st.write("### 📈 Monthly Analysis")
-                st.dataframe(summary, height=200) # Sirf table scroll hogi
+                st.dataframe(summary, height=200)
                 
-                st.write("### ✅ Matches")
-                st.dataframe(matches, height=300)
+                st.write("### ✅ Matches (Diff within range)")
+                st.dataframe(matches[['Name', 'Date_T', 'Amount_T', 'Date_Diff', 'Amt_Diff']], height=300)
                 
                 st.write("### ❌ Not Matches / Review")
                 st.dataframe(not_matches, height=300)
@@ -62,7 +64,7 @@ def main():
                     summary.to_excel(writer, sheet_name='Summary')
                     matches.to_excel(writer, sheet_name='Matches')
                     not_matches.to_excel(writer, sheet_name='Not_Matches')
-                st.download_button("📥 Download Report", output.getvalue(), "Recon_Final.xlsx")
+                st.download_button("📥 Download Final Professional Report", output.getvalue(), "Recon_Final.xlsx")
 
         if st.button("Logout"):
             st.session_state.authenticated = False
