@@ -14,15 +14,23 @@ def main():
         
         if tally_file and portal_file:
             if st.button("Reconcile Karein"):
-                # Tally file mein 1 row skip karni hai (aapke file format ke hisab se)
-                df_tally = pd.read_excel(tally_file, header=1) if tally_file.name.endswith('.xlsx') else pd.read_csv(tally_file, header=1)
+                # Header=1 use kiya hai taaki Tally ki pehli extra row hat jaye
+                df_tally = pd.read_excel(tally_file, header=1) if tally_file.name.endswith('.xlsx') else pd.read_csv(tally_file, skiprows=1)
                 df_portal = pd.read_excel(portal_file) if portal_file.name.endswith('.xlsx') else pd.read_csv(portal_file)
                 
-                # Column names ko force-rename kar rahe hain (Position ke hisaab se)
+                # Sabse zaroori step: Column ke naam badal kar fix kar rahe hain
                 df_tally.columns = ['Date', 'Party Name', 'Amount']
                 df_portal.columns = ['Date', 'Party Name', 'Amount']
                 
-                # Reconciliation
+                # Data saaf karna (Names ke aage-piche se space hatana)
+                df_tally['Party Name'] = df_tally['Party Name'].str.strip()
+                df_portal['Party Name'] = df_portal['Party Name'].str.strip()
+                
+                # Date format ko align karna
+                df_tally['Date'] = pd.to_datetime(df_tally['Date'])
+                df_portal['Date'] = pd.to_datetime(df_portal['Date'])
+                
+                # Merge (Match) karna
                 merged_df = pd.merge(df_tally, df_portal, on=['Date', 'Party Name'], suffixes=('_Tally', '_Portal'))
                 merged_df['Difference'] = merged_df['Amount_Tally'] - merged_df['Amount_Portal']
                 
