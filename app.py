@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 
+# Password protection
 PASSWORD = "Raman@2026"
 
 def main():
@@ -9,31 +10,24 @@ def main():
     user_pass = st.text_input("Password dalein:", type="password")
     
     if user_pass == PASSWORD:
-        tally_file = st.file_uploader("Tally Sales upload karein", type=['xlsx', 'csv'])
-        portal_file = st.file_uploader("Portal Sales upload karein", type=['xlsx', 'csv'])
+        tally_file = st.file_uploader("Tally Excel file upload karein", type=['xlsx'])
+        portal_file = st.file_uploader("Portal Excel file upload karein", type=['xlsx'])
         
         if tally_file and portal_file:
             if st.button("Reconcile Karein"):
-                # Header=1 use kiya hai taaki Tally ki pehli extra row hat jaye
-                df_tally = pd.read_excel(tally_file, header=1) if tally_file.name.endswith('.xlsx') else pd.read_csv(tally_file, skiprows=1)
-                df_portal = pd.read_excel(portal_file) if portal_file.name.endswith('.xlsx') else pd.read_csv(portal_file)
+                # Files ko read karna (header=1 kyunki Tally mein 1st row title hai)
+                df_tally = pd.read_excel(tally_file, header=1)
+                df_portal = pd.read_excel(portal_file)
                 
-                # Sabse zaroori step: Column ke naam badal kar fix kar rahe hain
+                # Column names fix karna
                 df_tally.columns = ['Date', 'Party Name', 'Amount']
                 df_portal.columns = ['Date', 'Party Name', 'Amount']
                 
-                # Data saaf karna (Names ke aage-piche se space hatana)
-                df_tally['Party Name'] = df_tally['Party Name'].str.strip()
-                df_portal['Party Name'] = df_portal['Party Name'].str.strip()
-                
-                # Date format ko align karna
-                df_tally['Date'] = pd.to_datetime(df_tally['Date'])
-                df_portal['Date'] = pd.to_datetime(df_portal['Date'])
-                
-                # Merge (Match) karna
+                # Merge logic
                 merged_df = pd.merge(df_tally, df_portal, on=['Date', 'Party Name'], suffixes=('_Tally', '_Portal'))
                 merged_df['Difference'] = merged_df['Amount_Tally'] - merged_df['Amount_Portal']
                 
+                st.write("### Reconciliation Report:")
                 st.dataframe(merged_df)
                 
                 # Download button
