@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 import io
 
-st.set_page_config(page_title="Sales Recon", layout="centered")
+st.set_page_config(page_title="Professional Recon", layout="wide")
 
 def main():
-    st.title("📊 Sales Reconciliation Tool")
+    st.title("📊 Advanced Sales Reconciliation")
     
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
+    if 'authenticated' not in st.session_state: st.session_state.authenticated = False
 
     if not st.session_state.authenticated:
         user_pass = st.text_input("Enter Password:", type="password")
@@ -16,52 +15,58 @@ def main():
             if user_pass == "Raman@2026":
                 st.session_state.authenticated = True
                 st.rerun()
-            else:
-                st.error("❌ Invalid Password")
     else:
-        # --- YE RAHI AAPKI CUSTOM GREETING ---
         st.success("Welcome Raman Roy! 👋")
         
-        tally_file = st.file_uploader("Tally Excel upload karein", type=['xlsx'])
-        portal_file = st.file_uploader("Portal Excel upload karein", type=['xlsx'])
+        col1, col2 = st.columns(2)
+        with col1: tally_file = st.file_uploader("Tally File", type=['xlsx'])
+        with col2: portal_file = st.file_uploader("Portal File", type=['xlsx'])
         
         if tally_file and portal_file:
-            if st.button("🚀 Process & Reconcile"):
-                with st.spinner('Data process ho raha hai...'):
-                    df_tally = pd.read_excel(tally_file, header=1)
-                    df_portal = pd.read_excel(portal_file)
-                    
-                    df_tally.columns = ['Date', 'Party Name', 'Amount']
-                    df_portal.columns = ['Date', 'Party Name', 'Amount']
-                    
-                    df_tally['Date'] = pd.to_datetime(df_tally['Date'])
-                    df_portal['Date'] = pd.to_datetime(df_portal['Date'])
-                    
-                    # Merge Logic
-                    merged = pd.merge(df_tally, df_portal, on=['Date', 'Party Name'], suffixes=('_Tally', '_Portal'))
-                    merged['Difference'] = merged['Amount_Tally'] - merged['Amount_Portal']
-                    
-                    # Categories
-                    matches = merged[merged['Difference'] == 0]
-                    not_matches = merged[merged['Difference'] != 0]
-                    
-                    # Monthly Summary
-                    merged['Month'] = merged['Date'].dt.strftime('%B-%Y')
-                    summary = merged.groupby('Month').agg({'Amount_Tally': 'sum', 'Amount_Portal': 'sum', 'Difference': 'sum'})
-                    
-                    st.write("### 📊 Monthly Summary")
-                    st.dataframe(summary)
-                    st.write(f"✅ Matched: {len(matches)} | ❌ Not Matched: {len(not_matches)}")
-                    
-                    # Download 3 Sheets
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        summary.to_excel(writer, sheet_name='Monthly_Summary')
-                        matches.to_excel(writer, sheet_name='Matches')
-                        not_matches.to_excel(writer, sheet_name='Unmatched')
-                    
-                    st.download_button("📥 Download Final Report (3 Sheets)", output.getvalue(), "Reconciliation_Final.xlsx")
-        
+            if st.button("🚀 Run Advanced Reconciliation"):
+                df_t = pd.read_excel(tally_file, header=1)
+                df_p = pd.read_excel(portal_file)
+                df_t.columns = ['Date', 'Name', 'Amount']
+                df_p.columns = ['Date', 'Name', 'Amount']
+                
+                # Date Formatting
+                df_t['Date'] = pd.to_datetime(df_t['Date'])
+                df_p['Date'] = pd.to_datetime(df_p['Date'])
+                
+                # Logic: Name match + Date diff (10-15) + Amount diff (1-1500)
+                merged = pd.merge(df_t, df_p, on='Name', suffixes=('_T', '_P'))
+                
+                merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days.abs()
+                merged['Amt_Diff'] = (merged['Amount_T'] - merged['Amount_P']).abs()
+                
+                # Categorization
+                matches = merged[(merged['Date_Diff'] <= 15) & (merged['Amt_Diff'] <= 1500)]
+                not_matches = merged[~((merged['Date_Diff'] <= 15) & (merged['Amt_Diff'] <= 1500))]
+                
+                # Formatting
+                merged['Date_T'] = merged['Date_T'].dt.strftime('%d-%m-%Y')
+                
+                # Monthly/Yearly Summary
+                merged['Month'] = pd.to_datetime(merged['Date_T'], format='%d-%m-%Y').dt.to_period('M')
+                summary = merged.groupby('Month').agg({'Amount_T': 'sum', 'Amount_P': 'sum', 'Amt_Diff': 'sum'})
+                
+                st.write("### 📈 Monthly Analysis")
+                st.dataframe(summary)
+                
+                st.write("### ✅ Matches (Criteria Met)")
+                st.dataframe(matches[['Name', 'Date_T', 'Amount_T', 'Date_Diff', 'Amt_Diff']])
+                
+                st.write("### ❌ Not Matches / Review Needed")
+                st.dataframe(not_matches)
+                
+                # Excel Download
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    summary.to_excel(writer, sheet_name='Summary')
+                    matches.to_excel(writer, sheet_name='Matches')
+                    not_matches.to_excel(writer, sheet_name='Not_Matches')
+                st.download_button("📥 Download Final Professional Report", output.getvalue(), "Recon_Final.xlsx")
+
         if st.button("Logout"):
             st.session_state.authenticated = False
             st.rerun()
