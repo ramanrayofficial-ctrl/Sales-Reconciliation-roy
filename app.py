@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import io
 
-# Professional UI Configuration
 st.set_page_config(page_title="Professional Sales Reconciliation", layout="wide")
 
 def main():
@@ -30,13 +29,21 @@ def main():
                 df_t = pd.read_excel(tally_file)
                 df_p = pd.read_excel(portal_file)
                 
-                # Column Naming (Ensure 'Date', 'Party Name', 'Amount' structure)
+                # Column Naming
                 df_t.columns = ['Date', 'Party Name', 'Amount']
                 df_p.columns = ['Date', 'Party Name', 'Amount']
                 
-                # Normalization
-                df_t['Date'] = pd.to_datetime(df_t['Date']).dt.normalize()
-                df_p['Date'] = pd.to_datetime(df_p['Date']).dt.normalize()
+                # --- FIXED: Date parsing with error handling ---
+                # 'coerce' galat dates ko ignore karke error se bachayega
+                df_t['Date'] = pd.to_datetime(df_t['Date'], errors='coerce')
+                df_p['Date'] = pd.to_datetime(df_p['Date'], errors='coerce')
+                
+                # Drop rows jahan date convert nahi ho payi
+                df_t = df_t.dropna(subset=['Date'])
+                df_p = df_p.dropna(subset=['Date'])
+                
+                df_t['Date'] = df_t['Date'].dt.normalize()
+                df_p['Date'] = df_p['Date'].dt.normalize()
                 
                 # Merging on Party Name (100% Match)
                 merged = pd.merge(df_t, df_p, on='Party Name', suffixes=('_Tally', '_Portal'))
@@ -61,7 +68,7 @@ def main():
                 st.markdown("### ❌ Discrepancy Report (Not Matches)")
                 st.dataframe(not_matches[cols], use_container_width=True)
                 
-                # Export Button
+                # Export
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     matches[cols].to_excel(writer, sheet_name='Matches', index=False)
