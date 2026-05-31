@@ -7,8 +7,7 @@ st.set_page_config(page_title="Professional Recon", layout="wide")
 def main():
     st.title("📊 Advanced Sales Reconciliation")
     
-    if 'authenticated' not in st.session_state: 
-        st.session_state.authenticated = False
+    if 'authenticated' not in st.session_state: st.session_state.authenticated = False
 
     if not st.session_state.authenticated:
         user_pass = st.text_input("Enter Password:", type="password")
@@ -31,11 +30,9 @@ def main():
                 df_t.columns = ['Date', 'Name', 'Tally Sales']
                 df_p.columns = ['Date', 'Name', 'Portal Sales']
                 
-                # Date ko sahi format mein laane ka logic
                 df_t['Date'] = pd.to_datetime(df_t['Date'])
                 df_p['Date'] = pd.to_datetime(df_p['Date'])
                 
-                # Ye naya format: Dikhne mein pura DD-MM-YYYY hoga
                 df_t['Date_Display'] = df_t['Date'].dt.strftime('%d-%m-%Y')
                 df_p['Date_Display'] = df_p['Date'].dt.strftime('%d-%m-%Y')
                 
@@ -47,6 +44,9 @@ def main():
                 merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days
                 merged['Amt_Diff'] = merged['Tally Sales'] - merged['Portal Sales']
                 
+                # Selection of Columns for Display
+                cols_to_show = ['Month', 'Name', 'Date_Display_T', 'Tally Sales', 'Date_Display_P', 'Portal Sales', 'Amt_Diff', 'Date_Diff']
+                
                 matches = merged[(merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)]
                 not_matches = merged[~((merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500))]
                 
@@ -56,11 +56,10 @@ def main():
                 st.dataframe(summary, height=200)
                 
                 st.write("### ✅ Matches")
-                # Ab Date_Display_T aur P use kar rahe hain, jo pura DD-MM-YYYY dikhayega
-                st.dataframe(matches[['Month', 'Name', 'Date_Display_T', 'Tally Sales', 'Portal Sales', 'Amt_Diff']], height=300)
+                st.dataframe(matches[cols_to_show], height=300)
                 
                 st.write("### ❌ Not Matches")
-                st.dataframe(not_matches[['Month', 'Name', 'Date_Display_T', 'Date_Display_P', 'Tally Sales', 'Portal Sales', 'Amt_Diff']], height=300)
+                st.dataframe(not_matches[cols_to_show], height=300)
                 
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
