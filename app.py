@@ -31,30 +31,34 @@ def main():
                 df_t.columns = ['Date', 'Name', 'Tally Sales']
                 df_p.columns = ['Date', 'Name', 'Portal Sales']
                 
-                # Date Processing
+                # Date Processing (Ensure datetime objects)
                 df_t['Date'] = pd.to_datetime(df_t['Date'])
                 df_p['Date'] = pd.to_datetime(df_p['Date'])
                 
+                # Create helper columns for Display
                 df_t['Tally Date'] = df_t['Date'].dt.strftime('%d-%m-%Y')
                 df_p['Portal Date'] = df_p['Date'].dt.strftime('%d-%m-%Y')
                 
+                # Month columns for merging
                 df_t['Month'] = df_t['Date'].dt.to_period('M')
                 df_p['Month'] = df_p['Date'].dt.to_period('M')
                 
                 # Merge
                 merged = pd.merge(df_t, df_p, on=['Month', 'Name'], suffixes=('_T', '_P'))
                 
-                # Calculations
-                merged['Date_Diff'] = (df_t['Date'] - df_p['Date']).dt.days
+                # --- CORRECTED CALCULATION ---
+                # Difference calculate karte waqt original datetime column ka use karein
+                merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days
                 merged['Amt_Diff'] = merged['Tally Sales'] - merged['Portal Sales']
                 
-                # Final Columns Order
+                # Columns for Display
                 cols_to_show = ['Name', 'Tally Date', 'Tally Sales', 'Portal Date', 'Portal Sales', 'Date_Diff', 'Amt_Diff']
                 
+                # Matches/Not Matches based on absolute differences
                 matches = merged[(merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)]
                 not_matches = merged[~((merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500))]
                 
-                # Monthly Analysis (Summary)
+                # Monthly Analysis
                 summary = merged.groupby('Month').agg({'Tally Sales': 'sum', 'Portal Sales': 'sum', 'Amt_Diff': 'sum'})
                 
                 st.write("### 📈 Monthly Analysis")
@@ -66,7 +70,7 @@ def main():
                 st.write("### ❌ Not Matches")
                 st.dataframe(not_matches[cols_to_show], height=400)
                 
-                # Excel Download
+                # Download
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     summary.to_excel(writer, sheet_name='Summary')
