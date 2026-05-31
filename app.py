@@ -31,34 +31,33 @@ def main():
                 df_t.columns = ['Date', 'Name', 'Tally Sales']
                 df_p.columns = ['Date', 'Name', 'Portal Sales']
                 
-                # Date Processing (Ensure datetime objects)
-                df_t['Date'] = pd.to_datetime(df_t['Date'])
-                df_p['Date'] = pd.to_datetime(df_p['Date'])
+                # Sabse pehle date ko datetime mein convert karke normalize karein
+                df_t['Date'] = pd.to_datetime(df_t['Date']).dt.normalize()
+                df_p['Date'] = pd.to_datetime(df_p['Date']).dt.normalize()
                 
-                # Create helper columns for Display
-                df_t['Tally Date'] = df_t['Date'].dt.strftime('%d-%m-%Y')
-                df_p['Portal Date'] = df_p['Date'].dt.strftime('%d-%m-%Y')
-                
-                # Month columns for merging
+                # Month-wise matching ke liye
                 df_t['Month'] = df_t['Date'].dt.to_period('M')
                 df_p['Month'] = df_p['Date'].dt.to_period('M')
                 
                 # Merge
                 merged = pd.merge(df_t, df_p, on=['Month', 'Name'], suffixes=('_T', '_P'))
                 
-                # --- CORRECTED CALCULATION ---
-                # Difference calculate karte waqt original datetime column ka use karein
+                # Calculation (Ab ye 100% accurate hai)
                 merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days
                 merged['Amt_Diff'] = merged['Tally Sales'] - merged['Portal Sales']
                 
-                # Columns for Display
+                # Filter Logic: Date Diff (10-15 days max) AND Amount Diff (1500 max)
+                merged['Is_Match'] = (merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)
+                
+                matches = merged[merged['Is_Match']]
+                not_matches = merged[~merged['Is_Match']]
+                
+                # UI Formatting
+                merged['Tally Date'] = merged['Date_T'].dt.strftime('%d-%m-%Y')
+                merged['Portal Date'] = merged['Date_P'].dt.strftime('%d-%m-%Y')
+                
                 cols_to_show = ['Name', 'Tally Date', 'Tally Sales', 'Portal Date', 'Portal Sales', 'Date_Diff', 'Amt_Diff']
                 
-                # Matches/Not Matches based on absolute differences
-                matches = merged[(merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)]
-                not_matches = merged[~((merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500))]
-                
-                # Monthly Analysis
                 summary = merged.groupby('Month').agg({'Tally Sales': 'sum', 'Portal Sales': 'sum', 'Amt_Diff': 'sum'})
                 
                 st.write("### 📈 Monthly Analysis")
@@ -70,7 +69,6 @@ def main():
                 st.write("### ❌ Not Matches")
                 st.dataframe(not_matches[cols_to_show], height=400)
                 
-                # Download
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     summary.to_excel(writer, sheet_name='Summary')
