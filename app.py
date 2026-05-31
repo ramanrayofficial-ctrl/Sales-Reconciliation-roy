@@ -31,42 +31,36 @@ def main():
                 df_t.columns = ['Date', 'Name', 'Tally Sales']
                 df_p.columns = ['Date', 'Name', 'Portal Sales']
                 
-                # Datetime normalization
+                # Normalize Dates
                 df_t['Date'] = pd.to_datetime(df_t['Date']).dt.normalize()
                 df_p['Date'] = pd.to_datetime(df_p['Date']).dt.normalize()
                 
-                # Month-wise matching
+                # Merge based on Name (100% Match) and Month
                 df_t['Month'] = df_t['Date'].dt.to_period('M')
                 df_p['Month'] = df_p['Date'].dt.to_period('M')
                 
-                # Merge
+                # Strict Inner Merge on Name and Month
                 merged = pd.merge(df_t, df_p, on=['Month', 'Name'], suffixes=('_T', '_P'))
                 
-                # Calculations
-                merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days
-                merged['Amt_Diff'] = merged['Tally Sales'] - merged['Portal Sales']
+                # Absolute Differences
+                merged['Date_Diff'] = (merged['Date_T'] - merged['Date_P']).dt.days.abs()
+                merged['Amt_Diff'] = (merged['Tally Sales'] - merged['Portal Sales']).abs()
                 
-                # Create Display Columns AFTER merge to avoid KeyError
+                # MATCHING CRITERIA: 
+                # 1. Name already 100% matched by merge
+                # 2. Date diff <= 15
+                # 3. Amount diff <= 1500
+                is_match = (merged['Date_Diff'] <= 15) & (merged['Amt_Diff'] <= 1500)
+                
+                matches = merged[is_match].copy()
+                not_matches = merged[~is_match].copy()
+                
+                # Formatting Display
                 merged['Tally Date'] = merged['Date_T'].dt.strftime('%d-%m-%Y')
                 merged['Portal Date'] = merged['Date_P'].dt.strftime('%d-%m-%Y')
-                
-                # Column Order
                 cols_to_show = ['Name', 'Tally Date', 'Tally Sales', 'Portal Date', 'Portal Sales', 'Date_Diff', 'Amt_Diff']
                 
-                # Filter Logic
-                merged['Is_Match'] = (merged['Date_Diff'].abs() <= 15) & (merged['Amt_Diff'].abs() <= 1500)
-                
-                matches = merged[merged['Is_Match']]
-                not_matches = merged[~merged['Is_Match']]
-                
-                # Summary for analysis
-                summary = merged.groupby('Month').agg({'Tally Sales': 'sum', 'Portal Sales': 'sum', 'Amt_Diff': 'sum'})
-                
-                st.write("### 📈 Monthly Analysis")
-                st.dataframe(summary, height=200)
-                
                 st.write("### ✅ Matches")
-                # Error yahan aa raha tha, ab fixed hai
                 st.dataframe(matches[cols_to_show], height=400)
                 
                 st.write("### ❌ Not Matches")
@@ -75,7 +69,6 @@ def main():
                 # Download
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    summary.to_excel(writer, sheet_name='Summary')
                     matches[cols_to_show].to_excel(writer, sheet_name='Matches', index=False)
                     not_matches[cols_to_show].to_excel(writer, sheet_name='Not_Matches', index=False)
                 st.download_button("📥 Download Final Report", output.getvalue(), "Recon_Final.xlsx")
