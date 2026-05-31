@@ -15,22 +15,26 @@ def main():
         
         if tally_file and portal_file:
             if st.button("Reconcile Karein"):
-                # Files read karna (Tally mein pehli line skip karni hai)
-                df_tally = pd.read_excel(tally_file, skiprows=1) if tally_file.name.endswith('.xlsx') else pd.read_csv(tally_file, skiprows=1)
+                # Files read karna
+                # 'header=1' use kar rahe hain kyunki aapki Tally file mein ek row extra hai
+                df_tally = pd.read_excel(tally_file, header=1) if tally_file.name.endswith('.xlsx') else pd.read_csv(tally_file, header=1)
                 df_portal = pd.read_excel(portal_file) if portal_file.name.endswith('.xlsx') else pd.read_csv(portal_file)
                 
-                # Column names clean karna
+                # Sirf pehle 3 columns le rahe hain taaki extra blank columns ka error na aaye
+                df_tally = df_tally.iloc[:, 0:3]
+                df_portal = df_portal.iloc[:, 0:3]
+                
+                # Columns ke naam fix karna
                 df_tally.columns = ['Date', 'Party Name', 'Amount']
                 df_portal.columns = ['Date', 'Party Name', 'Amount']
                 
-                # Merge logic
+                # Reconciliation
                 merged_df = pd.merge(df_tally, df_portal, on=['Date', 'Party Name'], suffixes=('_Tally', '_Portal'))
                 merged_df['Difference'] = merged_df['Amount_Tally'] - merged_df['Amount_Portal']
                 
-                st.write("### Reconciliation Report:")
                 st.dataframe(merged_df)
                 
-                # Download
+                # Excel Download
                 excel_buffer = io.BytesIO()
                 merged_df.to_excel(excel_buffer, index=False)
                 st.download_button("Excel mein Download karein", excel_buffer.getvalue(), "Report.xlsx", "application/vnd.ms-excel")
